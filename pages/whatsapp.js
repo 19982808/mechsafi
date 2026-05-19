@@ -1,20 +1,6 @@
 import { useState, useRef, useEffect } from 'react';
 import Head from 'next/head';
 
-const WA_SYS = `You are MECH SAFI AI — a WhatsApp AI mechanic assistant for Prestige Auto Centre, Westlands, Nairobi, Kenya.
-
-STRICT STYLE RULES:
-• Keep every message SHORT — maximum 6 lines, WhatsApp style
-• Never write long paragraphs
-• Use line breaks, *bold*, and emojis naturally
-• Detect language: Swahili reply Swahili; English reply English; mixed reply mixed
-• For car problems: ask ONE focused question, then give short answer
-• For pricing: give KES range briefly, then invite them to come in
-• For bookings: confirm enthusiastically
-• Be warm and local — like a trusted Kenyan mechanic friend
-• Sign off as "— MECH SAFI 🔧" only on the very first message
-• Garage hours: Mon–Sat, 7am–6pm. Location: Westlands, Nairobi`;
-
 const SCENARIOS = [
   { emoji:'🚗', label:'Engine noise',     msg:'My Toyota Harrier is making a knocking sound when I start it in the morning' },
   { emoji:'💰', label:'Get a quote',      msg:'How much to replace clutch on Subaru Forester 2010?' },
@@ -28,6 +14,7 @@ function ts() { return new Date().toLocaleTimeString('en-KE',{hour:'2-digit',min
 
 export default function WhatsAppDemo() {
   const [msgs, setMsgs]       = useState([]);
+  const [history, setHistory] = useState([]); // ← conversational memory
   const [input, setInput]     = useState('');
   const [loading, setLoading] = useState(false);
   const [leads, setLeads]     = useState([
@@ -43,8 +30,12 @@ export default function WhatsAppDemo() {
     const t = (text || input).trim();
     if (!t || loading) return;
     setInput('');
-    const next = [...msgs, { role:'user', content:t, time:ts() }];
-    setMsgs(next);
+
+    // Snapshot history BEFORE this turn (so API gets prior context only)
+    const currentHistory = history;
+
+    // Add user message to UI
+    setMsgs(prev => [...prev, { role:'user', content:t, time:ts() }]);
     setLoading(true);
 
     const tag = t.toLowerCase().includes('hybrid')||t.toLowerCase().includes('prius') ? 'Hybrid' :
@@ -62,23 +53,38 @@ export default function WhatsAppDemo() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          system: WA_SYS,
-          messages: next.map(m => ({ role:m.role, content:m.content })),
-          max_tokens: 400
+          message: t,              // ← current user message
+          history: currentHistory  // ← all previous turns for memory
         })
       });
+
       const d = await r.json();
-      const reply = d.content?.[0]?.text || '⚠️ Could not get response.';
-      setMsgs(p => [...p, { role:'assistant', content:reply, time:ts() }]);
-      if (reply.includes('KES')) setLeads(p => p.map((l,i) => i===0?{...l,status:'quoted',kes:reply.match(/KES[\s]*[\d,]+/)?.[0]||l.kes}:l));
+
+      // chat.js returns { reply: "..." } — Groq/OpenAI format
+      const reply = d.reply || '⚠️ Could not get response.';
+
+      // Add AI reply to UI
+      setMsgs(prev => [...prev, { role:'assistant', content:reply, time:ts() }]);
+
+      // Update history with both turns so next message has full context
+      setHistory(prev => [
+        ...prev,
+        { role:'user',      content:t     },
+        { role:'assistant', content:reply }
+      ]);
+
+      if (reply.includes('KES')) {
+        setLeads(p => p.map((l,i) => i===0 ? { ...l, status:'quoted', kes:reply.match(/KES[\s]*[\d,–]+/)?.[0] || l.kes } : l));
+      }
+
     } catch {
       setMsgs(p => [...p, { role:'assistant', content:'⚠️ Connection error. Please try again.', time:ts() }]);
     }
+
     setLoading(false);
   };
 
   const statusColor = { new:'#F59E0B', quoted:'#60A5FA', booked:'#22C55E' };
-
   const bg='#060A14', surf='#0D1628', surf2='#111F3A', bd='rgba(255,255,255,0.08)';
   const text='#E8F0FF', muted='rgba(232,240,255,0.5)', green='#25D366', orange='#FF6B1A';
   const font="'Inter',sans-serif", display="'Space Grotesk',sans-serif";
@@ -216,7 +222,7 @@ export default function WhatsAppDemo() {
               {leads.map((lead,i)=>(
                 <div key={i+lead.id} style={{ background:surf, border:`1px solid ${bd}`, borderRadius:11, padding:'11px 12px', animation:'slideIn .4s ease' }}>
                   <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:6 }}>
-                    <div style={{ fontSize:10, color:muted, fontFamily:"'Share Tech Mono',monospace" }}>{lead.id}</div>
+                    <div style={{ fontSize:10, color:muted }}>{lead.id}</div>
                     <span style={{ background:`${statusColor[lead.status]}22`, color:statusColor[lead.status], padding:'2px 8px', borderRadius:20, fontSize:10, fontWeight:600 }}>
                       {lead.status==='new'?'🔔 New':lead.status==='quoted'?'📋 Quoted':'📅 Booked'}
                     </span>
