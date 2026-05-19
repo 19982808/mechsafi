@@ -1,71 +1,107 @@
-// MECH SAFI — AI API Route
-// Using Groq (FREE) — powered by Llama 3.3 70B
-// Groq API docs: https://console.groq.com
+from pathlib import Path
 
-export default async function handler(req, res) {
+chat_js = r"""export default async function handler(req, res) {
   if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Method not allowed' });
+    return res.status(405).json({
+      error: 'Method not allowed'
+    })
   }
 
-  const { messages, system, max_tokens = 1000 } = req.body;
-
-  // Check API key exists
-  if (!process.env.GROQ_API_KEY) {
-    return res.status(500).json({
-      content: [{ text: '⚠️ GROQ_API_KEY not set. Go to Vercel → Settings → Environment Variables and add it.' }]
-    });
-  }
+  const { message } = req.body
 
   try {
-    // Groq uses OpenAI-style format
-    // System prompt goes as first message with role "system"
-    const groqMessages = [];
 
-    if (system) {
-      groqMessages.push({ role: 'system', content: system });
-    }
+    const response = await fetch(
+      'https://api.groq.com/openai/v1/chat/completions',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${process.env.GROQ_API_KEY}`
+        },
+        body: JSON.stringify({
+          model: 'llama3-70b-8192',
+          temperature: 0.7,
+          messages: [
+            {
+              role: 'system',
+              content: `
+You are Mech Safi AI.
 
-    // Add the conversation messages
-    groqMessages.push(...messages);
+You are a highly intelligent Kenyan automotive AI assistant.
 
-    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${process.env.GROQ_API_KEY}`
-      },
-      body: JSON.stringify({
-        model: 'llama-3.3-70b-versatile', // Best free model on Groq
-        max_tokens: max_tokens,
-        temperature: 0.7,
-        messages: groqMessages
-      })
-    });
+You fluently understand:
+- English
+- Swahili sanifu
+- Nairobi Swahili
+- Sheng
+- English-Swahili code switching
 
-    const data = await response.json();
+You understand Kenyan phrases like:
+- Niaje boss
+- Nadai ufix hii ndai
+- Gari inakula mafuta
+- Brake zinalia
+- Engine inatetemeka
+- Gari imekataa kuamka
+- Hii Beamer inatoa smoke
+- Steering inavuta side
 
-    // Handle Groq errors
-    if (data.error) {
-      console.error('Groq error:', data.error);
-      return res.status(400).json({
-        content: [{ text: `⚠️ AI error: ${data.error.message || 'Unknown error'}` }]
-      });
-    }
+You help users diagnose:
+- engine problems
+- suspension issues
+- overheating
+- battery issues
+- transmission issues
+- brake issues
+- electrical problems
+- diesel and petrol vehicle issues
 
-    // Extract the reply text from Groq response
-    const text = data.choices?.[0]?.message?.content || '⚠️ No response. Please try again.';
+You support:
+- Japanese cars
+- German cars
+- matatus
+- pickups
+- motorcycles
+- hybrids
+- trucks
 
-    // Return in same format the frontend expects
-    // (keeps all dashboard + WhatsApp code unchanged)
+You respond naturally like a smart Kenyan mechanic assistant.
+
+Keep answers practical, conversational, and concise.
+              `
+            },
+            {
+              role: 'user',
+              content: message
+            }
+          ]
+        })
+      }
+    )
+
+    const data = await response.json()
+
     return res.status(200).json({
-      content: [{ text }]
-    });
+      reply:
+        data?.choices?.[0]?.message?.content ||
+        'No AI response available.'
+    })
 
   } catch (error) {
-    console.error('API route error:', error);
+
     return res.status(500).json({
-      content: [{ text: '⚠️ Connection failed. Check your internet and try again.' }]
-    });
+      error: 'AI request failed'
+    })
+
   }
 }
+"""
 
+output_dir = Path("/mnt/data/generated")
+output_dir.mkdir(parents=True, exist_ok=True)
+
+path = output_dir / "chat.js"
+path.write_text(chat_js)
+
+print(f"Saved to {path}")
