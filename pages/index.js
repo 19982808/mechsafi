@@ -33,7 +33,7 @@ export default function Home() {
               onMouseOver={e=>e.currentTarget.style.borderColor='#25D366'}
               onMouseOut={e=>e.currentTarget.style.borderColor='rgba(37,211,102,0.3)'}>
               <div style={{ fontSize:42, marginBottom:14 }}>💬</div>
-              <div style={{ fontFamily:"'Space Grotesk',sans-serif", fontSize:18, fontWeight:700, color:'#fff', marginBottom:8 }}>WhatsApp AI Demo</div>
+              <div style={{ fontFamily:"'Space Grotesk',sans-serif", fontSize:18, fontWeight:700, color:'#fff', marginBottom:8 }}>WhatsApp AI Assistant</div>
               <div style={{ fontSize:13, color:'rgba(232,240,255,0.5)', lineHeight:1.6 }}>Show garage owners what their customers will experience. Live AI in Swahili & English.</div>
               <div style={{ marginTop:16, color:'#25D366', fontSize:13, fontWeight:600 }}>Open Demo →</div>
             </div>
